@@ -1,19 +1,20 @@
 # ui/image_viewer.py
 """
-Interactive image viewer with crop/region selection tools.
-QGraphicsView-based, supports zoom, pan, rubber-band crop.
+Interactive image viewer with crop/region selection and image processing tools.
+QGraphicsView-based, supports zoom, pan, rubber-band crop, rotation & image enhancement.
 """
 from PyQt6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
     QGraphicsRectItem, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFrame, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal, QSizeF
+from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal
 from PyQt6.QtGui import (
     QPixmap, QPen, QBrush, QColor, QWheelEvent,
-    QMouseEvent, QPainter, QFont, QCursor
+    QMouseEvent, QPainter, QCursor, QTransform
 )
 import os
+from core import image_enhancer
 
 
 class ImageCanvas(QGraphicsView):
@@ -37,13 +38,10 @@ class ImageCanvas(QGraphicsView):
         self._draw_origin: QPointF | None = None
         self._tool = "pan"  # 'pan' | 'crop'
         self._zoom = 1.0
+        self._rotation_angle = 0
         self._image_path: str = ""
 
         self.setStyleSheet("background-color: #080f1d; border: none;")
-
-    # -----------------------------------------------------------------------
-    # Public API
-    # -----------------------------------------------------------------------
 
     def load_image(self, path: str):
         self._scene.clear()
@@ -51,6 +49,7 @@ class ImageCanvas(QGraphicsView):
         self._region_items.clear()
         self._rubber_rect = None
         self._image_path = path
+        self._rotation_angle = 0
 
         pix = QPixmap(path)
         if pix.isNull():
@@ -61,6 +60,20 @@ class ImageCanvas(QGraphicsView):
         self._scene.setSceneRect(self._pixmap_item.boundingRect())
         self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
         self._zoom = 1.0
+
+    def rotate_image(self, angle_delta: int = 90):
+        if not self._pixmap_item:
+            return
+        self._rotation_angle = (self._rotation_angle + angle_delta) % 360
+        self.rotate(angle_delta)
+
+    def enhance_quality(self):
+        if not self._image_path or not os.path.exists(self._image_path):
+            return
+        enhanced_path = image_enhancer.enhance_land_document(
+            self._image_path, contrast=1.3, sharpness=1.5, auto_level=True
+        )
+        self.load_image(enhanced_path)
 
     def set_tool(self, tool: str):
         self._tool = tool
@@ -80,10 +93,6 @@ class ImageCanvas(QGraphicsView):
         if self._pixmap_item:
             self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
-    # -----------------------------------------------------------------------
-    # Zoom
-    # -----------------------------------------------------------------------
-
     def wheelEvent(self, event: QWheelEvent):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             delta = event.angleDelta().y()
@@ -93,10 +102,6 @@ class ImageCanvas(QGraphicsView):
             self.scale(factor, factor)
         else:
             super().wheelEvent(event)
-
-    # -----------------------------------------------------------------------
-    # Draw rubber-band crop region
-    # -----------------------------------------------------------------------
 
     def _scene_pos(self, event: QMouseEvent) -> QPointF:
         return self.mapToScene(event.pos())
@@ -133,7 +138,6 @@ class ImageCanvas(QGraphicsView):
                 x2 = min(1.0, rect.right() / img_rect.width())
                 y2 = min(1.0, rect.bottom() / img_rect.height())
 
-                # Add a persistent region indicator
                 pen = QPen(QColor("#059669"), 2)
                 brush = QBrush(QColor(5, 150, 105, 30))
                 region_item = QGraphicsRectItem(rect)
@@ -156,7 +160,7 @@ class ImageCanvas(QGraphicsView):
 
 
 class ImageViewer(QWidget):
-    """Full image viewer panel with toolbar."""
+    """Full image viewer panel with advanced toolbar."""
     region_selected = pyqtSignal(float, float, float, float)
 
     def __init__(self, parent=None):
@@ -173,16 +177,18 @@ class ImageViewer(QWidget):
         toolbar.setFixedHeight(40)
         toolbar.setStyleSheet("""
             QFrame { background: #0a1628; border-bottom: 1px solid #1e3a5f; }
-            QPushButton { min-width: 32px; min-height: 28px; border-radius: 4px; font-size: 13px; }
+            QPushButton { min-width: 30px; min-height: 28px; border-radius: 4px; font-size: 13px; }
         """)
         tbar_layout = QHBoxLayout(toolbar)
         tbar_layout.setContentsMargins(8, 4, 8, 4)
         tbar_layout.setSpacing(4)
 
         self.btn_pan = QPushButton("🖐 Di chuyển")
-        self.btn_crop = QPushButton("✂️ Chọn vùng OCR")
-        self.btn_clear = QPushButton("🗑")
-        self.btn_fit = QPushButton("⊡")
+        self.btn_crop = QPushButton("✂️ Vùng OCR")
+        self.btn_rotate = QPushButton("🔄 Xoay 90°")
+        self.btn_enhance = QPushButton("✨ Làm rõ ảnh")
+        self.btn_clear = QPushButton("🗑 Xóa vùng")
+        self.btn_fit = QPushButton("⊡ Fit")
         self.btn_zoom_in = QPushButton("🔍+")
         self.btn_zoom_out = QPushButton("🔍-")
 
@@ -193,8 +199,13 @@ class ImageViewer(QWidget):
         self.btn_pan.setObjectName("btn-primary")
         self.btn_crop.setStyleSheet("QPushButton:checked { background: #065f46; border-color: #059669; }")
 
-        for btn in (self.btn_pan, self.btn_crop, self.btn_fit, self.btn_zoom_in, self.btn_zoom_out, self.btn_clear):
+        for btn in (
+            self.btn_pan, self.btn_crop, self.btn_rotate,
+            self.btn_enhance, self.btn_fit, self.btn_zoom_in,
+            self.btn_zoom_out, self.btn_clear
+        ):
             tbar_layout.addWidget(btn)
+
         tbar_layout.addStretch()
         self.lbl_info = QLabel("")
         self.lbl_info.setStyleSheet("color: #64748b; font-size: 11px;")
@@ -210,6 +221,8 @@ class ImageViewer(QWidget):
         # Connect toolbar
         self.btn_pan.clicked.connect(lambda: self._set_tool("pan"))
         self.btn_crop.clicked.connect(lambda: self._set_tool("crop"))
+        self.btn_rotate.clicked.connect(lambda: self.canvas.rotate_image(90))
+        self.btn_enhance.clicked.connect(self.canvas.enhance_quality)
         self.btn_clear.clicked.connect(self.canvas.clear_regions)
         self.btn_fit.clicked.connect(self.canvas.fit_to_window)
         self.btn_zoom_in.clicked.connect(lambda: self.canvas.scale(1.2, 1.2))

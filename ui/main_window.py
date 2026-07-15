@@ -22,6 +22,7 @@ from ui.land_form import GcnForm, HopDongForm
 from ui.database_panel import DatabasePanel
 from ui.ocr_worker import OcrWorker
 from ui.settings_dialog import SettingsDialog
+from ui.batch_dialog import BatchDialog
 from core import database, file_handler, config_manager as cfg
 
 
@@ -57,12 +58,19 @@ class MainWindow(QMainWindow):
         act_open = QAction("📂 Mở file hồ sơ...", self)
         act_open.setShortcut("Ctrl+O")
         act_open.triggered.connect(self._open_file)
+
+        act_batch = QAction("⚡ Số hóa hàng loạt (Batch)...", self)
+        act_batch.setShortcut("Ctrl+B")
+        act_batch.triggered.connect(self._open_batch_dialog)
+
         act_settings = QAction("⚙️ Cài đặt...", self)
         act_settings.triggered.connect(self._open_settings)
         act_quit = QAction("Thoát", self)
         act_quit.setShortcut("Ctrl+Q")
         act_quit.triggered.connect(self.close)
+
         file_menu.addAction(act_open)
+        file_menu.addAction(act_batch)
         file_menu.addSeparator()
         file_menu.addAction(act_settings)
         file_menu.addSeparator()
@@ -145,14 +153,17 @@ class MainWindow(QMainWindow):
 
         # Nav buttons
         self.btn_nav_ocr = self._sidebar_btn("📷 Số hóa hồ sơ", True)
+        self.btn_nav_batch = self._sidebar_btn("⚡ Số hóa hàng loạt", False)
         self.btn_nav_db = self._sidebar_btn("🗄 Cơ sở dữ liệu", False)
         self.btn_nav_settings = self._sidebar_btn("⚙️ Cài đặt", False)
 
         self.btn_nav_ocr.clicked.connect(lambda: self._switch_view("ocr"))
+        self.btn_nav_batch.clicked.connect(self._open_batch_dialog)
         self.btn_nav_db.clicked.connect(lambda: self._switch_view("db"))
         self.btn_nav_settings.clicked.connect(self._open_settings)
 
         layout.addWidget(self.btn_nav_ocr)
+        layout.addWidget(self.btn_nav_batch)
         layout.addWidget(self.btn_nav_db)
         layout.addWidget(self.btn_nav_settings)
         layout.addSpacing(16)
@@ -562,6 +573,11 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(self)
         if dlg.exec():
             self._update_model_indicator()
+
+    def _open_batch_dialog(self):
+        dlg = BatchDialog(self)
+        dlg.exec()
+        self.db_panel.refresh()
 
     # =========================================================================
     # ABOUT
