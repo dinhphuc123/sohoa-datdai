@@ -2,8 +2,6 @@
 import sys
 import os
 
-block_cipher = None
-
 added_files = [
     ('assets', 'assets'),
     ('config.json', '.'),
@@ -36,13 +34,10 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -54,7 +49,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # False for GUI application (no terminal window popup)
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -73,7 +68,6 @@ coll = COLLECT(
     name='DatDaiDesktop',
 )
 
-# On macOS, optionally bundle into a .app bundle
 if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
