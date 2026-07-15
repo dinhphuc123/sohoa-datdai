@@ -2,6 +2,11 @@
 import sys
 import os
 
+# Auto-create default config.json if not present on clean CI checkout
+if not os.path.exists('config.json'):
+    with open('config.json', 'w', encoding='utf-8') as f:
+        f.write('{\n  "ocr_mode": "gemini"\n}\n')
+
 added_files = [
     ('assets', 'assets'),
     ('config.json', '.'),

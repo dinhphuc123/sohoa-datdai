@@ -1,0 +1,12 @@
+{
+  "gemini_api_key": "",
+  "mistral_api_key": "",
+  "ocr_mode": "gemini",
+  "lmstudio_url": "http://localhost:1234",
+  "lmstudio_model": "local-model",
+  "output_dir": "data/output",
+  "db_path": "data/dat_dai.db",
+  "app_theme": "dark",
+  "app_language": "vi",
+  "last_open_dir": ""
+}
