@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+venv/
+env/
+ENV/
+.venv/
+
+# PyInstaller & Build outputs
+build/
+dist/
+*.manifest
+*.spec.bak
+
+# App runtime data & User SQLite DBs
+data/*.db
+data/*.db-journal
+data/output/*
+!data/output/.gitkeep
+config.json
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+.DS_Store

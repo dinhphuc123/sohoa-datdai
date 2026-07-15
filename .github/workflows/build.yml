@@ -1,0 +1,84 @@
+name: Build Cross-Platform Desktop Apps (Windows, macOS, Linux)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: DatDaiDesktop-Windows
+            asset_name: DatDaiDesktop-Windows.zip
+          - os: macos-latest
+            artifact_name: DatDaiDesktop-macOS
+            asset_name: DatDaiDesktop-macOS.zip
+          - os: ubuntu-latest
+            artifact_name: DatDaiDesktop-Linux
+            asset_name: DatDaiDesktop-Linux.tar.gz
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller -r requirements.txt
+
+      - name: Build Desktop Application with PyInstaller
+        run: |
+          pyinstaller --clean -y dat_dai_desktop.spec
+
+      - name: Compress artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/DatDaiDesktop/* -DestinationPath DatDaiDesktop-Windows.zip
+
+      - name: Compress artifacts (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist && zip -r ../DatDaiDesktop-macOS.zip . && cd ..
+
+      - name: Compress artifacts (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd dist && tar -czvf ../DatDaiDesktop-Linux.tar.gz DatDaiDesktop && cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Release Packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            DatDaiDesktop-Windows/DatDaiDesktop-Windows.zip
+            DatDaiDesktop-macOS/DatDaiDesktop-macOS.zip
+            DatDaiDesktop-Linux/DatDaiDesktop-Linux.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
