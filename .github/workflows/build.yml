@@ -6,6 +6,10 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:
 
+# Grant workflow permission to write repository contents (needed for softprops/action-gh-release)
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
